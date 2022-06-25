@@ -6,7 +6,9 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ProductVariantPrice;
 use App\Models\Variant;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -15,11 +17,46 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Http\Response|\Illuminate\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
+        $productQuery = Product::query();
 
-        $products = Product::all();
-        return view('products.index', compact('products'));
+        if (!empty($request->title)) {
+            $productQuery->where('title', 'LIKE', "%{$request->title}%");
+        }
+
+        if (!empty($request->variant)) {
+
+            $productQuery->whereHas('productVariants', function ($q) use ($request) {
+                $q->where('variant', $request->variant);
+            });
+        }
+
+        if (!empty($request->price_from)) {
+            $productQuery->whereHas('productVariantPrice', function ($q) use ($request) {
+                $q->where('price', '>=', $request->price_from);
+            });
+        }
+        if (!empty($request->price_to)) {
+            $productQuery->whereHas('productVariantPrice', function ($q) use ($request) {
+                $q->where('price', '<=', $request->price_to);
+            });
+            //dd($productQuery->get()); 
+        }
+
+        if (!empty($request->date)) {
+            $temp = Carbon::parse($request->date);
+            $value = date_format($temp, 'Y-m-d');
+            $productQuery->where('created_at', 'LIKE', "%{$value}%");
+            //dd($productQuery->get());
+        }
+
+        $products = $productQuery->paginate(2);
+        $variants = Variant::all();
+        return view('products.index', [
+            'products' => $products,
+            'variants' => $variants
+        ]);
     }
 
     /**
